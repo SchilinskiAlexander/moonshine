@@ -135,11 +135,11 @@ class Fields extends BaseCollection implements FieldsContract
     }
 
     /**
+     * @return Collection<array-key, array<array-key, mixed>>
      * @throws Throwable
      */
-    public function whenFieldsConditions(): static
+    public function whenFieldsConditions(): Collection
     {
-        /** @var static */
         return $this->whenFields()->map(
             static fn (
                 FieldContract $field
@@ -159,7 +159,7 @@ class Fields extends BaseCollection implements FieldsContract
         /** @var static */
         return ($preparedFields ?? $this->onlyFields(withApplyWrappers: true))->map(
             static fn (FieldContract $field): FieldContract => (clone $field)
-                ->fillData(\is_null($casted) ? $raw : $casted, $index)
+                ->fillData($casted ?? $raw, $index)
         );
     }
 
@@ -170,19 +170,33 @@ class Fields extends BaseCollection implements FieldsContract
         ?FieldsContract $preparedFields = null
     ): static {
         /** @var static */
-        return ($preparedFields ?? $this)->map(static function (ComponentContract $component) use ($raw, $casted, $index): ComponentContract {
+        return ($preparedFields ?? $this)->map(function (ComponentContract $component) use ($raw, $casted, $index): ComponentContract {
             if ($component instanceof HasFieldsContract) {
                 $component = (clone $component)->fields(
                     $component->getFields()->fillClonedRecursively($raw, $casted, $index)
                 );
             }
 
-            if ($component instanceof FieldContract) {
-                $component->fillData(\is_null($casted) ? $raw : $casted, $index);
-            }
+            $this->fillComponent($component, $raw, $casted, $index);
 
             return clone $component;
         });
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     */
+    private function fillComponent(
+        ComponentContract $component,
+        array $raw,
+        ?DataWrapperContract $casted,
+        int $index
+    ): void {
+        if (! $component instanceof FieldContract) {
+            return;
+        }
+
+        $component->fillData($casted ?? $raw, $index);
     }
 
     /**
@@ -192,7 +206,7 @@ class Fields extends BaseCollection implements FieldsContract
     {
         $this->onlyFields(withApplyWrappers: true)->map(
             static fn (FieldContract $field): FieldContract => $field
-                ->fillData(\is_null($casted) ? $raw : $casted, $index)
+                ->fillData($casted ?? $raw, $index)
         );
     }
 

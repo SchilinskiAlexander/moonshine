@@ -50,13 +50,35 @@ final class OptimizerCollection implements OptimizerCollectionContract
     }
 
     /**
-     * @return array<array-key, mixed>
+     * @template T of object
+     *
+     * @param  class-string<T>  $contract
+     *
+     * @return (T is PageContract ? list<class-string<PageContract>> : (T is ResourceContract ? list<class-string<ResourceContract>> : array<array-key, mixed>))
      */
     public function getType(string $contract, ?string $namespace = null, bool $withCache = true): array
     {
         return $this->getTypes($namespace, $withCache)[$contract] ?? [];
     }
 
+    /**
+     * @template T of object
+     *
+     * @param  class-string<T>  $contract
+     *
+     * @return list<class-string<T>>
+     */
+    public function getClassType(string $contract, ?string $namespace = null, bool $withCache = true): array
+    {
+        return array_values(array_filter(
+            $this->getType($contract, $namespace, $withCache),
+            static fn (mixed $class): bool => \is_string($class) && is_a($class, $contract, true),
+        ));
+    }
+
+    /**
+     * @param  class-string  $contract
+     */
     public function hasType(string $contract): bool
     {
         return $this->getType($contract) !== [];
@@ -99,7 +121,9 @@ final class OptimizerCollection implements OptimizerCollectionContract
 
         foreach ($this->groups as $type) {
             foreach ($items as $value) {
-                $autoload[$type] = array_unique(array_merge($autoload[$type] ?? [], $value[$type] ?? []));
+                /** @var array<string> $merged */
+                $merged = array_merge($autoload[$type] ?? [], $value[$type] ?? []);
+                $autoload[$type] = array_unique($merged);
             }
         }
 

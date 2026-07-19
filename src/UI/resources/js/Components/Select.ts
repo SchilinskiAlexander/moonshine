@@ -2,7 +2,7 @@ import TomSelect from 'tom-select'
 import type { RecursivePartial, TomSettings } from 'tom-select/src/types'
 import { TPluginHash } from 'tom-select/src/contrib/microplugin'
 
-import { crudFormQuery, getQueryString, prepareFormExtraData } from '../Support/Forms.js'
+import { asyncExtraQuery, crudFormQuery, getQueryString, prepareFormExtraData } from '../Support/Forms.js'
 import { dispatchEvents as de } from '../Support/DispatchEvents.js'
 import { formToJSON } from 'axios'
 import request from '../Request/Core.js'
@@ -63,6 +63,7 @@ const MaxItemsPlugin = TomSelect.define('max_items', function (pluginOptions = {
 
 export default (asyncUrl = '', settings: UserSettings = {}, plugins: TPluginHash = {}) => ({
     selectInstance: null,
+    ownsSelectInstance: false,
     isMultiple: false,
     placeholder: null,
     searchEnabled: null,
@@ -75,6 +76,11 @@ export default (asyncUrl = '', settings: UserSettings = {}, plugins: TPluginHash
     translates: allTranslates,
 
     init() {
+        if (this.$el.tomselect) {
+            this.selectInstance = this.$el.tomselect
+            return
+        }
+
         if (! pluginInitialize) {
             document.dispatchEvent(new CustomEvent('moonshine:select_init', {
                 detail: {
@@ -92,6 +98,8 @@ export default (asyncUrl = '', settings: UserSettings = {}, plugins: TPluginHash
         this.searchEnabled = !! this.$el.dataset.searchEnabled
         this.removeItemButton = !! this.$el.dataset.removeItemButton
         this.associatedWith = this.$el.dataset.associatedWith
+
+        const isInsideTippy = this.$el.closest('[data-tippy-root]') !== null
 
         if (this.associatedWith) {
             this.$el.removeAttribute('data-associated-with')
@@ -146,7 +154,7 @@ export default (asyncUrl = '', settings: UserSettings = {}, plugins: TPluginHash
             disabledField: 'disabled',
             searchField: [ 'label' ],
             dataAttr: 'customProperties',
-            dropdownParent: 'body',
+            dropdownParent: isInsideTippy ? null : 'body',
 
             shouldOpen: ! asyncUrl,
 
@@ -228,6 +236,7 @@ export default (asyncUrl = '', settings: UserSettings = {}, plugins: TPluginHash
         }
 
         this.selectInstance = new TomSelect(this.$el, commonSettings)
+        this.ownsSelectInstance = true
 
         this.$nextTick(() => {
             this.setClassSelectedEmptyValue.call(this.selectInstance)
@@ -258,6 +267,16 @@ export default (asyncUrl = '', settings: UserSettings = {}, plugins: TPluginHash
                 })
             }
         })
+    },
+
+    destroy() {
+        if (! this.ownsSelectInstance || ! this.selectInstance || this.$el.tomselect !== this.selectInstance) {
+            return
+        }
+
+        this.selectInstance.destroy()
+        this.selectInstance = null
+        this.ownsSelectInstance = false
     },
 
     asyncOnInit() {
@@ -309,6 +328,11 @@ export default (asyncUrl = '', settings: UserSettings = {}, plugins: TPluginHash
 
             if (this.$el.dataset.asyncWithAllFields && inputs.length) {
                 formQuery += (formQuery ? '&' : '') + crudFormQuery(inputs)
+            }
+
+            const extraQuery = asyncExtraQuery(this.$el)
+            if (extraQuery) {
+                formQuery += (formQuery ? '&' : '') + extraQuery
             }
 
             options = await this.fetchOptions(url.toString() + '&' + formQuery)

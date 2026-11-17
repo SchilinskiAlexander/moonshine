@@ -32,6 +32,7 @@ export default async function request(
       data: body,
       headers: headers,
       responseType: componentRequestData.responseType,
+      signal: componentRequestData.signal ?? undefined,
     }).then(async function (response) {
       t.loading = false
 
@@ -102,6 +103,11 @@ export default async function request(
       }
     })
   } catch (errorResponse) {
+    // A request cancelled by a newer one: the newer one owns the loading state and the DOM
+    if (axios.isCancel(errorResponse)) {
+      return
+    }
+
     t.loading = false
 
     if (componentRequestData.hasResponseHandler()) {
@@ -124,20 +130,19 @@ export default async function request(
       } catch (e) {
         console.error(e.message)
 
-        MoonShine.ui.toast('Unknown Error', 'error')
-        return
+        data = null
       }
+    }
+
+    // Runs without a response too, so the caller can recover (e.g. re-enable a form's submit button)
+    if (componentRequestData.hasErrorCallback()) {
+      componentRequestData.errorCallback(data || {}, t)
     }
 
     if (!data) {
       console.error(errorResponse.message)
-
       MoonShine.ui.toast('Unknown Error', 'error')
       return
-    }
-
-    if (componentRequestData.hasErrorCallback()) {
-      componentRequestData.errorCallback(data, t)
     }
 
     if (t.$el?.dataset?.withoutErrorToast === undefined) {

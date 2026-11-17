@@ -58,6 +58,7 @@ it('show field on pages', function () {
         ->assertOk()
         ->assertSee('Imageable')
         ->assertSee($this->image->imageable->name)
+        ->assertSee("x-data=\"{morphType: 'MoonShine\\\\Tests\\\\Fixtures\\\\Models\\\\Item'}\"", false)
     ;
 });
 
@@ -72,6 +73,23 @@ it('apply as base', function () {
         ->assertSee($this->image->imageable->name)
     ;
 });
+
+it('creates an item with a morph to relation', function (string $modelClass): void {
+    $target = $modelClass::factory()->create();
+
+    asAdmin()->post($this->resource->getRoute('crud.store'), [
+        'imageable_type' => $modelClass,
+        'imageable_id' => $target->getKey(),
+    ])->assertRedirect();
+
+    $this->assertDatabaseCount('images', 2);
+    $created = ImageModel::query()->whereKeyNot($this->image->getKey())->sole();
+
+    expect($created)
+        ->imageable_type->toBe($modelClass)
+        ->imageable_id->toBe($target->getKey())
+        ->and($created->imageable->is($target))->toBeTrue();
+})->with([[Item::class], [Category::class]]);
 
 it('renders morph type as iterable field inside relation repeater', function () {
     $imageResource = repeaterImageResource();

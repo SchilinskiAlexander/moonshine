@@ -20,6 +20,7 @@ use MoonShine\Contracts\UI\HasFieldsContract;
 use MoonShine\Contracts\UI\RelationFieldContract;
 use MoonShine\Core\Traits\HasResource;
 use MoonShine\Laravel\Resources\ModelResource;
+use MoonShine\Support\EnumToString;
 use MoonShine\UI\Exceptions\FieldException;
 use MoonShine\UI\Fields\Field;
 use Throwable;
@@ -63,15 +64,13 @@ abstract class ModelRelationField extends Field implements RelationFieldContract
 
         parent::__construct($label, $relationName, $formatted);
 
-        if (\is_null($relationName)) {
-            $relationName = Str::of($this->getLabel())
-                ->camel()
-                ->when(
-                    $this->isToOne(),
-                    static fn (Stringable $str): Stringable => $str->singular(),
-                    static fn (Stringable $str): Stringable => $str->plural(),
-                )->value();
-        }
+        $relationName ??= Str::of($this->getLabel())
+            ->camel()
+            ->when(
+                $this->isToOne(),
+                static fn (Stringable $str): Stringable => $str->singular(),
+                static fn (Stringable $str): Stringable => $str->plural(),
+            )->value();
 
         $this->setRelationName($relationName);
 
@@ -232,7 +231,9 @@ abstract class ModelRelationField extends Field implements RelationFieldContract
             $value = data_get($value, $this->getResource()?->getColumn());
         }
 
-        return $this->formattedValue ?? $value;
+        return (new EnumToString(
+            $this->formattedValue ?? $value
+        ))->convert();
     }
 
     public function isOutsideComponent(): bool

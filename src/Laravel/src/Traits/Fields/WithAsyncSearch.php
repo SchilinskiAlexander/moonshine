@@ -14,6 +14,7 @@ use MoonShine\Contracts\UI\FieldContract;
 use MoonShine\Laravel\Http\Requests\Relations\RelationModelFieldRequest;
 use MoonShine\Support\DTOs\Select\Option;
 use MoonShine\Support\DTOs\Select\OptionProperty;
+use MoonShine\Support\EnumToString;
 
 trait WithAsyncSearch
 {
@@ -158,14 +159,14 @@ trait WithAsyncSearch
     {
         $searchColumn ??= $this->getAsyncSearchColumn();
 
-        if (\is_null($searchColumn)) {
-            $searchColumn = '';
-        }
+        $searchColumn ??= '';
+
+        $label = \is_null($this->getAsyncSearchValueCallback())
+            ? data_get($model, $searchColumn, '')
+            : \call_user_func($this->getAsyncSearchValueCallback(), $model, $this);
 
         return new Option(
-            label: \is_null($this->getAsyncSearchValueCallback())
-                ? (string) data_get($model, $searchColumn, '')
-                : (string) \call_user_func($this->getAsyncSearchValueCallback(), $model, $this),
+            label: (string) (new EnumToString($label))->convert(),
             value: (string)$model->getKey(),
             properties: new OptionProperty($this->getImageUrl($model)),
         );
